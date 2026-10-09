@@ -16,7 +16,10 @@ defmodule GettextSigils.Sigil do
 
   @spec sigil_t(Macro.t(), charlist()) :: Macro.t()
   defmacro sigil_t(term, modifiers) do
-    opts = Module.get_attribute(__CALLER__.module, :__gettext_sigils__)
+    # Unset while the block that `use`s GettextSigils is still being expanded.
+    opts =
+      Module.get_attribute(__CALLER__.module, :__gettext_sigils__) ||
+        Module.get_attribute(__CALLER__.module, :__gettext_sigils_expanded__)
 
     defaults = {Keyword.get(opts, :domain, :default), Keyword.get(opts, :context, nil)}
 
