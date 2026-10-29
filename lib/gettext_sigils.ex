@@ -37,14 +37,16 @@ defmodule GettextSigils do
     end
   end
 
-  # `~t` may expand before the module body sets `@__gettext_sigils__`, so options that need
-  # only the caller's env are also stored now; attributes and variables stay runtime-only.
+  # The module body expands before it runs, so options that need only the caller's env are also
+  # stored now for `~t` outside functions; others clear what an earlier `use` stored.
   defp expand_early(_opts, %{module: nil}), do: :ok
 
   defp expand_early(opts, env) do
     if early?(opts) do
       {value, _binding} = Code.eval_quoted(opts, [], env)
       Module.put_attribute(env.module, :__gettext_sigils_expanded__, GettextSigils.Options.validate!(value))
+    else
+      Module.delete_attribute(env.module, :__gettext_sigils_expanded__)
     end
 
     :ok
@@ -54,6 +56,8 @@ defmodule GettextSigils do
     {_ast, early?} =
       Macro.prewalk(opts, true, fn
         {:@, _, _} = ast, _acc -> {ast, false}
+        # The type in `<<x::binary>>` (from string interpolation) is not a variable.
+        {:"::", _, [expr, _type]}, acc -> {{:__block__, [], [expr]}, acc}
         {name, _, ctx} = ast, acc when is_atom(name) and is_atom(ctx) -> {ast, acc and name == :__MODULE__}
         ast, acc -> {ast, acc}
       end)

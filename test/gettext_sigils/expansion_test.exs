@@ -47,4 +47,42 @@ defmodule GettextSigilsTest.Expansion do
 
     assert module.label() == "var: label"
   end
+
+  test "options with string interpolation resolve outside functions" do
+    [{module, _}] =
+      Code.compile_string("""
+      defmodule GettextSigilsTest.Expansion.Interpolated do
+        use GettextSigils, backend: GettextSigilsTest.DummyGettext, sigils: [domain: "\#{:interp}"]
+        @label ~t"label"
+        def label, do: @label
+      end
+      """)
+
+    assert module.label() == "interp: label"
+  end
+
+  test "outside a function, options from attributes raise a clear error" do
+    assert_raise CompileError, ~r/needs :sigils options without variables or attributes/, fn ->
+      Code.compile_string("""
+      defmodule GettextSigilsTest.Expansion.AttributeAtBody do
+        @dom "attr"
+        use GettextSigils, backend: GettextSigilsTest.DummyGettext, sigils: [domain: @dom]
+        @label ~t"label"
+      end
+      """)
+    end
+  end
+
+  test "a later use with runtime-only options discards the options stored by an earlier use" do
+    assert_raise CompileError, ~r/needs :sigils options without variables or attributes/, fn ->
+      Code.compile_string("""
+      defmodule GettextSigilsTest.Expansion.StaleOptions do
+        use GettextSigils, backend: GettextSigilsTest.DummyGettext, sigils: [domain: "first"]
+        @dom "second"
+        use GettextSigils, backend: GettextSigilsTest.DummyGettext, sigils: [domain: @dom]
+        @label ~t"label"
+      end
+      """)
+    end
+  end
 end

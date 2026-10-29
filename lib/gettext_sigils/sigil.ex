@@ -16,10 +16,11 @@ defmodule GettextSigils.Sigil do
 
   @spec sigil_t(Macro.t(), charlist()) :: Macro.t()
   defmacro sigil_t(term, modifiers) do
-    # Unset while the block that `use`s GettextSigils is still being expanded.
+    # The runtime attribute is unset while the module body is still being expanded.
     opts =
       Module.get_attribute(__CALLER__.module, :__gettext_sigils__) ||
-        Module.get_attribute(__CALLER__.module, :__gettext_sigils_expanded__)
+        Module.get_attribute(__CALLER__.module, :__gettext_sigils_expanded__) ||
+        raise_unset!(__CALLER__)
 
     defaults = {Keyword.get(opts, :domain, :default), Keyword.get(opts, :context, nil)}
 
@@ -33,6 +34,15 @@ defmodule GettextSigils.Sigil do
     |> preprocess(modifiers)
     |> pluralize(modifiers)
     |> translate_or_noop(domain, context, modifiers)
+  end
+
+  defp raise_unset!(env) do
+    raise CompileError,
+      file: env.file,
+      line: env.line,
+      description:
+        "~t outside a function in #{inspect(env.module)} needs :sigils options without " <>
+          "variables or attributes in the latest `use GettextSigils`; otherwise use ~t inside a function"
   end
 
   defp interpolate(term), do: Interpolation.parse!(term)
