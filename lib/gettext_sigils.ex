@@ -25,8 +25,9 @@ defmodule GettextSigils do
 
   defmacro __using__(opts) do
     {sigils_opts, gettext_opts} = Keyword.pop(opts, :sigils, [])
+    sigils_opts = Macro.expand_literals(sigils_opts, __CALLER__)
 
-    expand_early(sigils_opts, __CALLER__)
+    put_literal_options(sigils_opts, __CALLER__)
 
     quote do
       use Gettext, unquote(gettext_opts)
@@ -37,31 +38,16 @@ defmodule GettextSigils do
     end
   end
 
-  # The module body expands before it runs, so options that need only the caller's env are also
-  # stored now for `~t` outside functions; others clear what an earlier `use` stored.
-  defp expand_early(_opts, %{module: nil}), do: :ok
-
-  defp expand_early(opts, env) do
-    if early?(opts) do
-      {value, _binding} = Code.eval_quoted(opts, [], env)
-      Module.put_attribute(env.module, :__gettext_sigils_expanded__, GettextSigils.Options.validate!(value))
+  # The module body expands before it runs, so literal options are also stored now for `~t` outside
+  # functions; other options clear what an earlier `use` stored.
+  defp put_literal_options(opts, %{module: module}) when not is_nil(module) do
+    if Macro.quoted_literal?(opts) do
+      {value, _binding} = Code.eval_quoted(opts)
+      Module.put_attribute(module, :__gettext_sigils__, GettextSigils.Options.validate!(value))
     else
-      Module.delete_attribute(env.module, :__gettext_sigils_expanded__)
+      Module.delete_attribute(module, :__gettext_sigils__)
     end
-
-    :ok
   end
 
-  defp early?(opts) do
-    {_ast, early?} =
-      Macro.prewalk(opts, true, fn
-        {:@, _, _} = ast, _acc -> {ast, false}
-        # The type in `<<x::binary>>` (from string interpolation) is not a variable.
-        {:"::", _, [expr, _type]}, acc -> {{:__block__, [], [expr]}, acc}
-        {name, _, ctx} = ast, acc when is_atom(name) and is_atom(ctx) -> {ast, acc and name == :__MODULE__}
-        ast, acc -> {ast, acc}
-      end)
-
-    early?
-  end
+  defp put_literal_options(_opts, _env), do: :ok
 end

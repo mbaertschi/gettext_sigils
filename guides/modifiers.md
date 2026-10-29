@@ -94,9 +94,9 @@ placeholders reach the msgid) and postprocessing is skipped. See
 
 > #### Outside functions {: .info}
 >
-> A `~t` outside a function, such as `@label ~t"Archived"X`, expands before the
-> module body runs. It needs `:sigils` options without variables or module
-> attributes in the latest `use GettextSigils`; otherwise it raises a
+> Outside a function, such as in `@label ~t"Archived"X`, `~t` expands before
+> the module body runs. It only works with `X` there, and the latest
+> `use GettextSigils` needs literal `:sigils` options; otherwise it raises a
 > `CompileError`.
 
 ## Keyword-list modifiers
